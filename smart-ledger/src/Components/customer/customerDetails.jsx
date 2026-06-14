@@ -10,6 +10,7 @@ export default function CustomerDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({});
+  const [phoneError, setPhoneError] = useState('');
   
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -17,6 +18,33 @@ export default function CustomerDetails() {
   const formatCurrency = (value) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(num) ? '0.00' : num.toFixed(2);
+  };
+
+  // Validate phone number (exactly 10 digits)
+  const validatePhoneNumber = (phone) => {
+    const phoneRegex = /^[0-9]{10}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    // Only allow numbers
+    const numbersOnly = value.replace(/[^0-9]/g, '');
+    
+    // Limit to 10 digits
+    if (numbersOnly.length <= 10) {
+      setFormData({...formData, phone: numbersOnly});
+      setPhoneError('');
+      
+      // Validate on the fly
+      if (numbersOnly.length === 10) {
+        if (!validatePhoneNumber(numbersOnly)) {
+          setPhoneError('Phone number must be exactly 10 digits');
+        }
+      } else if (numbersOnly.length > 0 && numbersOnly.length < 10) {
+        setPhoneError(`Phone number needs ${10 - numbersOnly.length} more digit(s)`);
+      }
+    }
   };
 
   useEffect(() => {
@@ -40,7 +68,7 @@ export default function CustomerDetails() {
       setFormData({
         full_name: processedData.full_name,
         email: currentUser.email,
-        phone: processedData.cellphone,
+        phone: processedData.cellphone || '',
         address: processedData.address,
         gender: processedData.gender,
         employment_status: processedData.employment_status
@@ -55,6 +83,13 @@ export default function CustomerDetails() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    
+    // Validate phone number before submitting
+    if (!validatePhoneNumber(formData.phone)) {
+      setPhoneError('Phone number must be exactly 10 digits');
+      alert('Please enter a valid 10-digit phone number');
+      return;
+    }
     
     try {
       const response = await fetch(`http://localhost:5000/api/customers/${currentUser.customer_id}`, {
@@ -191,14 +226,23 @@ export default function CustomerDetails() {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">Phone Number</label>
-                <input 
-                  type="tel" 
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800 ${!isEditing ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`} 
-                  value={formData.phone || ''} 
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                  disabled={!isEditing} 
-                />
+                <label className="block text-gray-700 text-sm font-medium mb-2">Phone Number (10 digits)</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input 
+                    type="tel" 
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800 ${!isEditing ? 'bg-gray-100 border-gray-200 text-gray-500' : 'border-gray-300'}`} 
+                    value={formData.phone || ''} 
+                    onChange={handlePhoneChange}
+                    disabled={!isEditing}
+                    maxLength="10"
+                    placeholder="0712345678"
+                  />
+                </div>
+                {phoneError && isEditing && (
+                  <p className="text-xs text-red-500 mt-1">{phoneError}</p>
+                )}
+                <p className="text-xs text-gray-400 mt-1">Enter exactly 10 digits (e.g., 0712345678)</p>
               </div>
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-2">Gender</label>
@@ -251,6 +295,7 @@ export default function CustomerDetails() {
                 <button 
                   type="submit" 
                   className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:opacity-90 flex items-center justify-center gap-2"
+                  disabled={!!phoneError}
                 >
                   <Save className="w-4 h-4" />
                   Save Changes

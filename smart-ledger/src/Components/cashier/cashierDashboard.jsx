@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, ShoppingCart, Package, TrendingUp, LogOut, 
-  Clock, DollarSign, CreditCard, Calendar
+  Clock, DollarSign, CreditCard, Calendar, Store
 } from 'lucide-react';
 
 export default function CashierDashboard() {
@@ -18,8 +18,10 @@ export default function CashierDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  const currentCashier = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const today = new Date().toISOString().split('T')[0];
+  const shopId = currentUser.shop_id;
+  const shopName = currentUser.shop_name;
 
   // Helper function to safely parse numeric values
   const parseNumeric = (value) => {
@@ -35,7 +37,11 @@ export default function CashierDashboard() {
 
   const fetchTodayStats = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/transactions/daily/${today}`);
+      const response = await fetch(`http://localhost:5000/api/transactions/daily/${today}`, {
+        headers: {
+          'shop-id': shopId
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       const transactionsArray = Array.isArray(data) ? data : [];
@@ -60,7 +66,11 @@ export default function CashierDashboard() {
 
   const fetchRecentTransactions = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/transactions/daily/${today}`);
+      const response = await fetch(`http://localhost:5000/api/transactions/daily/${today}`, {
+        headers: {
+          'shop-id': shopId
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch transactions');
       const data = await response.json();
       setRecentTransactions(Array.isArray(data) ? data.slice(0, 5) : []);
@@ -113,8 +123,12 @@ export default function CashierDashboard() {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
         <div className="flex justify-between items-center px-8 py-4">
           <div>
-            <h1 className="text-2xl font-bold">Cashier Dashboard</h1>
-            <p className="text-white/90 text-sm mt-1">Welcome, {currentCashier.full_name || 'Cashier'} | {currentCashier.shop_name || 'Moroka Supermarket'}</p>
+            <div className="flex items-center gap-3 mb-1">
+              <Store className="w-5 h-5 text-white" />
+              <h1 className="text-2xl font-bold">Cashier Dashboard</h1>
+            </div>
+            <p className="text-white/90 text-sm mt-1">Welcome, {currentUser.full_name || 'Cashier'}</p>
+            <p className="text-white/70 text-xs mt-1">Shop: {shopName || 'Moroka Supermarket'}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="bg-white/20 px-3 py-1 rounded-lg text-sm">
@@ -125,7 +139,7 @@ export default function CashierDashboard() {
               onClick={() => {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                navigate('/');
+                window.location.href = '/';
               }}
               className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-colors"
             >
@@ -136,7 +150,7 @@ export default function CashierDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards - Now showing real data or zeros */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-8">
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between">

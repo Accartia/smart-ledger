@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Download, Plus, Package, Edit, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Search, Download, Plus, Package, Edit, Trash2, X, PlusCircle } from 'lucide-react';
 
 export default function ProductCatalog() {
   const navigate = useNavigate();
@@ -9,7 +9,14 @@ export default function ProductCatalog() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [showNewUnitModal, setShowNewUnitModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newUnitName, setNewUnitName] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
+  const [categories, setCategories] = useState(['Fruits', 'Vegetables', 'Dairy', 'Bakery', 'Meat', 'Pantry', 'Beverages', 'Household', 'Personal Care']);
+  const [units, setUnits] = useState(['per kg', 'per litre', 'per loaf', 'per dozen', 'per pack', 'per bottle', 'per bar', 'per tube']);
+  
   const [newProduct, setNewProduct] = useState({
     name: '',
     category: '',
@@ -18,8 +25,67 @@ export default function ProductCatalog() {
     stock: ''
   });
 
-  const categories = ['Fruits', 'Vegetables', 'Dairy', 'Bakery', 'Meat', 'Pantry', 'Beverages', 'Household', 'Personal Care'];
-  const units = ['per kg', 'per litre', 'per loaf', 'per dozen', 'per pack', 'per bottle', 'per bar', 'per tube'];
+  // Load categories and units from localStorage
+  useEffect(() => {
+    loadCategoriesFromStorage();
+    loadUnitsFromStorage();
+  }, []);
+
+  const loadCategoriesFromStorage = () => {
+    const savedCategories = localStorage.getItem('productCategories');
+    if (savedCategories) {
+      setCategories(JSON.parse(savedCategories));
+    }
+  };
+
+  const loadUnitsFromStorage = () => {
+    const savedUnits = localStorage.getItem('productUnits');
+    if (savedUnits) {
+      setUnits(JSON.parse(savedUnits));
+    }
+  };
+
+  const saveCategoriesToStorage = (updatedCategories) => {
+    localStorage.setItem('productCategories', JSON.stringify(updatedCategories));
+    setCategories(updatedCategories);
+  };
+
+  const saveUnitsToStorage = (updatedUnits) => {
+    localStorage.setItem('productUnits', JSON.stringify(updatedUnits));
+    setUnits(updatedUnits);
+  };
+
+  const handleAddNewCategory = () => {
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+    if (categories.includes(newCategoryName)) {
+      alert('Category already exists');
+      return;
+    }
+    const updatedCategories = [...categories, newCategoryName];
+    saveCategoriesToStorage(updatedCategories);
+    setNewCategoryName('');
+    setShowNewCategoryModal(false);
+    alert(`Category "${newCategoryName}" added successfully!`);
+  };
+
+  const handleAddNewUnit = () => {
+    if (!newUnitName.trim()) {
+      alert('Please enter a unit name');
+      return;
+    }
+    if (units.includes(newUnitName)) {
+      alert('Unit already exists');
+      return;
+    }
+    const updatedUnits = [...units, newUnitName];
+    saveUnitsToStorage(updatedUnits);
+    setNewUnitName('');
+    setShowNewUnitModal(false);
+    alert(`Unit "${newUnitName}" added successfully!`);
+  };
 
   // Load products from API
   useEffect(() => {
@@ -39,8 +105,8 @@ export default function ProductCatalog() {
   };
 
   const filteredProducts = products.filter(p => 
-    p.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    p.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleExport = () => {
@@ -107,9 +173,9 @@ export default function ProductCatalog() {
         body: JSON.stringify({
           product_name: editingProduct.product_name,
           category: editingProduct.category,
-          price: editingProduct.price,
+          price: parseFloat(editingProduct.price),
           unit: editingProduct.unit,
-          stock_quantity: editingProduct.stock_quantity,
+          stock_quantity: parseInt(editingProduct.stock_quantity) || 0,
           reorder_level: editingProduct.reorder_level,
           supplier: editingProduct.supplier
         })
@@ -152,10 +218,7 @@ export default function ProductCatalog() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
       </div>
     );
   }
@@ -307,16 +370,25 @@ export default function ProductCatalog() {
 
                 <div>
                   <label className="block text-gray-700 text-sm font-medium mb-1">Category *</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={newProduct.category}
-                    onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-                  >
-                    <option value="">Select category</option>
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                      value={newProduct.category}
+                      onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowNewCategoryModal(true)}
+                      className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      New
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -333,16 +405,25 @@ export default function ProductCatalog() {
 
                 <div>
                   <label className="block text-gray-700 text-sm font-medium mb-1">Unit *</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={newProduct.unit}
-                    onChange={(e) => setNewProduct({...newProduct, unit: e.target.value})}
-                  >
-                    <option value="">Select unit</option>
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                      value={newProduct.unit}
+                      onChange={(e) => setNewProduct({...newProduct, unit: e.target.value})}
+                    >
+                      <option value="">Select Unit</option>
+                      {units.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowNewUnitModal(true)}
+                      className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      New
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -353,6 +434,7 @@ export default function ProductCatalog() {
                     value={newProduct.stock}
                     onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})}
                     placeholder="0"
+                    min="0"
                   />
                 </div>
               </div>
@@ -394,22 +476,31 @@ export default function ProductCatalog() {
                   <input
                     type="text"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={editingProduct.product_name}
+                    value={editingProduct.product_name || ''}
                     onChange={(e) => setEditingProduct({...editingProduct, product_name: e.target.value})}
                   />
                 </div>
 
                 <div>
                   <label className="block text-gray-700 text-sm font-medium mb-1">Category</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={editingProduct.category}
-                    onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                      value={editingProduct.category || ''}
+                      onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowNewCategoryModal(true)}
+                      className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      New
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -418,31 +509,41 @@ export default function ProductCatalog() {
                     type="number"
                     step="0.01"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={editingProduct.price}
-                    onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                    value={editingProduct.price || 0}
+                    onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})}
                   />
                 </div>
 
                 <div>
                   <label className="block text-gray-700 text-sm font-medium mb-1">Unit</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={editingProduct.unit}
-                    onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value})}
-                  >
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                      value={editingProduct.unit || ''}
+                      onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value})}
+                    >
+                      {units.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowNewUnitModal(true)}
+                      className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      New
+                    </button>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-1">Stock</label>
+                  <label className="block text-gray-700 text-sm font-medium mb-1">Stock Quantity</label>
                   <input
                     type="number"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                    value={editingProduct.stock_quantity}
-                    onChange={(e) => setEditingProduct({...editingProduct, stock_quantity: e.target.value})}
+                    value={editingProduct.stock_quantity || 0}
+                    onChange={(e) => setEditingProduct({...editingProduct, stock_quantity: parseInt(e.target.value)})}
+                    min="0"
                   />
                 </div>
               </div>
@@ -459,6 +560,76 @@ export default function ProductCatalog() {
                   className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:opacity-90"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Category Modal */}
+      {showNewCategoryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Add New Category</h2>
+              <button onClick={() => setShowNewCategoryModal(false)} className="text-white/80 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-1">Category Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Enter new category name"
+                />
+                <p className="text-xs text-gray-400 mt-1">e.g., Snacks, Frozen Foods, etc.</p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowNewCategoryModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button onClick={handleAddNewCategory} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">
+                  Add Category
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Unit Modal */}
+      {showNewUnitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Add New Unit</h2>
+              <button onClick={() => setShowNewUnitModal(false)} className="text-white/80 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-1">Unit Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                  value={newUnitName}
+                  onChange={(e) => setNewUnitName(e.target.value)}
+                  placeholder="Enter new unit"
+                />
+                <p className="text-xs text-gray-400 mt-1">e.g., per box, per pack, per piece, etc.</p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowNewUnitModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button onClick={handleAddNewUnit} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">
+                  Add Unit
                 </button>
               </div>
             </div>

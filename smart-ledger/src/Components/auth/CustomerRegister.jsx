@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Store } from 'lucide-react';
+import { ArrowLeft, Store, User, Mail, Phone, MapPin, Briefcase, DollarSign, Lock } from 'lucide-react';
 
 export default function CustomerRegister() {
   const navigate = useNavigate();
@@ -20,6 +20,7 @@ export default function CustomerRegister() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [registeredCustomer, setRegisteredCustomer] = useState(null);
 
   useEffect(() => {
     fetchShops();
@@ -78,6 +79,20 @@ export default function CustomerRegister() {
       return;
     }
 
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(formData.cellphone)) {
+      setError('Please enter a valid 10-digit cellphone number');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.selectedShop) {
+      setError('Please select a shop');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:5000/api/register/customer', {
         method: 'POST',
@@ -91,7 +106,7 @@ export default function CustomerRegister() {
           employmentStatus: formData.employmentStatus,
           monthlyIncome: formData.monthlyIncome,
           password: formData.password,
-          shopId: formData.selectedShop
+          shopId: parseInt(formData.selectedShop)
         })
       });
       
@@ -121,9 +136,7 @@ export default function CustomerRegister() {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Registration Successful!</h2>
           <p className="text-gray-600 mb-4">Your account has been created successfully.</p>
-          <Link to="/login/customer" className="inline-block w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:opacity-90">
-            Proceed to Login
-          </Link>
+          <p className="text-sm text-gray-500">You will be redirected to login...</p>
         </div>
       </div>
     );
@@ -158,41 +171,52 @@ export default function CustomerRegister() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-gray-700 text-sm font-medium mb-1">Full Name *</label>
-                <input
-                  type="text"
-                  name="fullName"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="Enter full name"
-                />
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    name="fullName"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="Enter full name"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Email Address *</label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="customer@example.com"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="customer@example.com"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Cellphone Number *</label>
-                <input
-                  type="tel"
-                  name="cellphone"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.cellphone}
-                  onChange={handleChange}
-                  placeholder="0712345678"
-                />
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="tel"
+                    name="cellphone"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.cellphone}
+                    onChange={handleChange}
+                    placeholder="0712345678"
+                    maxLength="10"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Enter exactly 10 digits</p>
               </div>
 
               <div>
@@ -213,79 +237,94 @@ export default function CustomerRegister() {
 
               <div className="md:col-span-2">
                 <label className="block text-gray-700 text-sm font-medium mb-1">Address *</label>
-                <textarea
-                  name="address"
-                  required
-                  rows="2"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Enter your address"
-                />
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                  <textarea
+                    name="address"
+                    required
+                    rows="2"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Enter your address"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Employment Status *</label>
-                <select
-                  name="employmentStatus"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.employmentStatus}
-                  onChange={handleChange}
-                >
-                  <option value="">Select Status</option>
-                  <option value="employed">Employed</option>
-                  <option value="unemployed">Unemployed (SASSA Grant)</option>
-                </select>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <select
+                    name="employmentStatus"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.employmentStatus}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="employed">Employed</option>
+                    <option value="unemployed">Unemployed (SASSA Grant)</option>
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Monthly Income *</label>
-                <select
-                  name="monthlyIncome"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.monthlyIncome}
-                  onChange={handleChange}
-                  disabled={!formData.employmentStatus}
-                >
-                  <option value="">Select Income Range</option>
-                  {getIncomeOptions().map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <select
+                    name="monthlyIncome"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.monthlyIncome}
+                    onChange={handleChange}
+                    disabled={!formData.employmentStatus}
+                  >
+                    <option value="">Select Income Range</option>
+                    {getIncomeOptions().map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Select Shop *</label>
-                <select
-                  name="selectedShop"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.selectedShop}
-                  onChange={handleChange}
-                >
-                  <option value="">Select a shop</option>
-                  {shops.map(shop => (
-                    <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <select
+                    name="selectedShop"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.selectedShop}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select a shop</option>
+                    {shops.map(shop => (
+                      <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
+                    ))}
+                  </select>
+                </div>
                 {shops.length === 0 && (
-                  <p className="text-xs text-yellow-600 mt-1">No shops available. Please contact shop owner.</p>
+                  <p className="text-xs text-yellow-600 mt-1">No shops available. Please contact a shop owner.</p>
                 )}
               </div>
 
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">Password *</label>
-                <input
-                  type="password"
-                  name="password"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Minimum 6 characters"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Minimum 6 characters"
+                  />
+                </div>
               </div>
 
               <div>
@@ -294,10 +333,10 @@ export default function CustomerRegister() {
                   type="password"
                   name="confirmPassword"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-800"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  placeholder="Confirm password"
+                  placeholder="Confirm your password"
                 />
               </div>
             </div>

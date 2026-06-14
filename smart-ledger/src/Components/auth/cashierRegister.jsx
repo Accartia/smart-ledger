@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Phone, Lock, ArrowLeft, Briefcase, MapPin, Store } from 'lucide-react';
 
 export default function CashierRegister() {
   const navigate = useNavigate();
+  const [shops, setShops] = useState([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     phone: '',
-    shopName: '',
-    shopLocation: '',
+    selectedShopId: '',
     position: '',
     password: '',
     confirmPassword: ''
@@ -18,6 +18,21 @@ export default function CashierRegister() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Load shops for dropdown
+  useEffect(() => {
+    fetchShops();
+  }, []);
+
+  const fetchShops = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/shops');
+      const data = await response.json();
+      setShops(data);
+    } catch (error) {
+      console.error('Error fetching shops:', error);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -32,7 +47,7 @@ export default function CashierRegister() {
     setError('');
     
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || 
-        !formData.shopName || !formData.shopLocation || !formData.position) {
+        !formData.selectedShopId || !formData.position) {
       setError('Please fill in all fields');
       setLoading(false);
       return;
@@ -50,11 +65,27 @@ export default function CashierRegister() {
       return;
     }
 
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError('Please enter a valid 10-digit phone number');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:5000/api/register/cashier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          shopId: formData.selectedShopId,
+          position: formData.position,
+          password: formData.password
+        })
       });
       
       const data = await response.json();
@@ -77,10 +108,11 @@ export default function CashierRegister() {
   if (success) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow p-8 text-center max-w-md">
+        <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-md">
           <div className="text-green-500 text-6xl mb-4">✓</div>
           <h2 className="text-2xl font-bold mb-2">Registration Successful!</h2>
-          <p className="text-gray-600">Redirecting to login...</p>
+          <p className="text-gray-600">Your cashier account has been created.</p>
+          <p className="text-sm text-gray-500 mt-2">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -109,7 +141,7 @@ export default function CashierRegister() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-700 text-sm mb-1">First Name</label>
+                <label className="block text-gray-700 text-sm mb-1">First Name *</label>
                 <input
                   type="text"
                   name="firstName"
@@ -122,7 +154,7 @@ export default function CashierRegister() {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Last Name</label>
+                <label className="block text-gray-700 text-sm mb-1">Last Name *</label>
                 <input
                   type="text"
                   name="lastName"
@@ -135,7 +167,7 @@ export default function CashierRegister() {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Email Address</label>
+                <label className="block text-gray-700 text-sm mb-1">Email Address *</label>
                 <input
                   type="email"
                   name="email"
@@ -148,7 +180,7 @@ export default function CashierRegister() {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Phone Number</label>
+                <label className="block text-gray-700 text-sm mb-1">Phone Number *</label>
                 <input
                   type="tel"
                   name="phone"
@@ -157,33 +189,33 @@ export default function CashierRegister() {
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="0712345678"
+                  maxLength="10"
                 />
+                <p className="text-xs text-gray-400 mt-1">10-digit cellphone number</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Shop Name</label>
-                <input
-                  type="text"
-                  name="shopName"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
-                  value={formData.shopName}
-                  onChange={handleChange}
-                  placeholder="Enter shop name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 text-sm mb-1">Shop Location</label>
-                <input
-                  type="text"
-                  name="shopLocation"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
-                  value={formData.shopLocation}
-                  onChange={handleChange}
-                  placeholder="Enter shop location"
-                />
+                <label className="block text-gray-700 text-sm mb-1">Select Shop *</label>
+                <div className="relative">
+                  <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <select
+                    name="selectedShopId"
+                    required
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+                    value={formData.selectedShopId}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select a shop</option>
+                    {shops.map(shop => (
+                      <option key={shop.shop_id} value={shop.shop_id}>
+                        {shop.shop_name} - {shop.location || 'Main Store'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {shops.length === 0 && (
+                  <p className="text-xs text-yellow-600 mt-1">No shops available. Please contact an administrator.</p>
+                )}
               </div>
 
               <div>
@@ -203,7 +235,7 @@ export default function CashierRegister() {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Password</label>
+                <label className="block text-gray-700 text-sm mb-1">Password *</label>
                 <input
                   type="password"
                   name="password"
@@ -216,7 +248,7 @@ export default function CashierRegister() {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
+                <label className="block text-gray-700 text-sm mb-1">Confirm Password *</label>
                 <input
                   type="password"
                   name="confirmPassword"

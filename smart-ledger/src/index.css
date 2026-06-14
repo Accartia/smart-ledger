@@ -129,3 +129,11 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Add this at the bottom of your index.css */
+.bg-supermarket {
+  background-image: url('/super.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

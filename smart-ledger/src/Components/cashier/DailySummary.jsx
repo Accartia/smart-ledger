@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar, Search, Eye, Download, 
   DollarSign, CreditCard, TrendingUp, Users,
-  Printer, Filter
+  Printer, Filter, Store
 } from 'lucide-react';
 
 export default function DailySummary() {
@@ -14,6 +14,10 @@ export default function DailySummary() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const shopId = currentUser.shop_id;
+  const shopName = currentUser.shop_name;
 
   // Helper function to safely parse numeric values
   const parseNumeric = (value) => {
@@ -30,7 +34,11 @@ export default function DailySummary() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5000/api/transactions/daily/${selectedDate}`);
+      const response = await fetch(`http://localhost:5000/api/transactions/daily/${selectedDate}`, {
+        headers: {
+          'shop-id': shopId
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch transactions');
       const data = await response.json();
       
@@ -49,7 +57,6 @@ export default function DailySummary() {
     }
   };
 
-  // Calculate totals using parsed numeric values
   const dailyTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
   const dailyCredit = transactions.filter(t => t.payment_method === 'credit').reduce((sum, t) => sum + t.amount, 0);
   const dailyCash = transactions.filter(t => t.payment_method === 'cash').reduce((sum, t) => sum + t.amount, 0);
@@ -98,12 +105,7 @@ export default function DailySummary() {
         <div className="text-center bg-white rounded-xl shadow-lg p-8 max-w-md">
           <div className="text-red-500 text-5xl mb-4">⚠️</div>
           <p className="text-gray-800 font-semibold">{error}</p>
-          <button 
-            onClick={fetchTransactions} 
-            className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg"
-          >
-            Retry
-          </button>
+          <button onClick={fetchTransactions} className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg">Retry</button>
         </div>
       </div>
     );
@@ -122,8 +124,11 @@ export default function DailySummary() {
               Back
             </button>
             <div>
-              <h1 className="text-2xl font-bold">Daily Summary Report</h1>
-              <p className="text-white/90 text-sm mt-1">View daily sales transactions</p>
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5" />
+                <h1 className="text-2xl font-bold">Daily Summary Report</h1>
+              </div>
+              <p className="text-white/90 text-sm mt-1">View daily sales transactions for {shopName || 'your shop'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -224,7 +229,11 @@ export default function DailySummary() {
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 ? (
-                  <tr><td colSpan="7" className="text-center py-12 text-gray-500">No transactions for this date</td></tr>
+                  <tr>
+                    <td colSpan="7" className="text-center py-12 text-gray-500">
+                      No transactions for this date
+                    </td>
+                  </tr>
                 ) : (
                   filteredTransactions.map((transaction, index) => (
                     <tr key={transaction.transaction_id} className={`border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>

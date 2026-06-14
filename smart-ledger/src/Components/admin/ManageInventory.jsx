@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Package, Plus, Edit, Trash2, Search, 
-  Filter, Download, Printer, X, AlertCircle, DollarSign
+  Filter, Download, Printer, X, AlertCircle, DollarSign,
+  PlusCircle
 } from 'lucide-react';
 
 export default function ManageInventory() {
@@ -11,11 +12,16 @@ export default function ManageInventory() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [showNewUnitModal, setShowNewUnitModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newUnitName, setNewUnitName] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(['Fruits', 'Vegetables', 'Dairy', 'Bakery', 'Meat', 'Pantry', 'Beverages', 'Household', 'Personal Care']);
+  const [units, setUnits] = useState(['per kg', 'per litre', 'per loaf', 'per dozen', 'per pack', 'per bottle', 'per bar', 'per tube']);
 
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -27,12 +33,68 @@ export default function ManageInventory() {
     supplier: ''
   });
 
-  const units = ['per kg', 'per litre', 'per loaf', 'per dozen', 'per pack', 'per bottle', 'per bar', 'per tube'];
-
   // Load products from API
   useEffect(() => {
     fetchProducts();
+    loadCategoriesFromStorage();
+    loadUnitsFromStorage();
   }, []);
+
+  const loadCategoriesFromStorage = () => {
+    const savedCategories = localStorage.getItem('productCategories');
+    if (savedCategories) {
+      setCategories(JSON.parse(savedCategories));
+    }
+  };
+
+  const loadUnitsFromStorage = () => {
+    const savedUnits = localStorage.getItem('productUnits');
+    if (savedUnits) {
+      setUnits(JSON.parse(savedUnits));
+    }
+  };
+
+  const saveCategoriesToStorage = (updatedCategories) => {
+    localStorage.setItem('productCategories', JSON.stringify(updatedCategories));
+    setCategories(updatedCategories);
+  };
+
+  const saveUnitsToStorage = (updatedUnits) => {
+    localStorage.setItem('productUnits', JSON.stringify(updatedUnits));
+    setUnits(updatedUnits);
+  };
+
+  const handleAddNewCategory = () => {
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+    if (categories.includes(newCategoryName)) {
+      alert('Category already exists');
+      return;
+    }
+    const updatedCategories = [...categories, newCategoryName];
+    saveCategoriesToStorage(updatedCategories);
+    setNewCategoryName('');
+    setShowNewCategoryModal(false);
+    alert(`Category "${newCategoryName}" added successfully!`);
+  };
+
+  const handleAddNewUnit = () => {
+    if (!newUnitName.trim()) {
+      alert('Please enter a unit name');
+      return;
+    }
+    if (units.includes(newUnitName)) {
+      alert('Unit already exists');
+      return;
+    }
+    const updatedUnits = [...units, newUnitName];
+    saveUnitsToStorage(updatedUnits);
+    setNewUnitName('');
+    setShowNewUnitModal(false);
+    alert(`Unit "${newUnitName}" added successfully!`);
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -43,7 +105,6 @@ export default function ManageInventory() {
       const data = await response.json();
       const productsArray = Array.isArray(data) ? data : [];
       
-      // Convert price to number and ensure all numeric values are proper
       const processedProducts = productsArray.map(p => ({
         ...p,
         price: typeof p.price === 'string' ? parseFloat(p.price) : (p.price || 0),
@@ -52,9 +113,6 @@ export default function ManageInventory() {
       }));
       
       setProducts(processedProducts);
-      // Extract unique categories
-      const uniqueCategories = [...new Set(processedProducts.map(p => p?.category).filter(Boolean))];
-      setCategories(uniqueCategories);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -63,7 +121,6 @@ export default function ManageInventory() {
     }
   };
 
-  // Filter products
   const filteredProducts = products.filter(p => {
     if (!p) return false;
     const matchesSearch = (p.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,7 +130,6 @@ export default function ManageInventory() {
     return matchesSearch && matchesCategory;
   });
 
-  // Calculate statistics
   const totalProducts = products.length;
   const lowStockCount = products.filter(p => p && (p.stock_quantity || 0) <= (p.reorder_level || 0)).length;
   const outOfStockCount = products.filter(p => p && (p.stock_quantity || 0) === 0).length;
@@ -85,6 +141,18 @@ export default function ManageInventory() {
       return;
     }
 
+    const stockAmount = parseInt(newProduct.stock);
+    if (isNaN(stockAmount) || stockAmount < 0) {
+      alert('Stock cannot be negative. Please enter a valid number (0 or greater)');
+      return;
+    }
+
+    const priceAmount = parseFloat(newProduct.price);
+    if (isNaN(priceAmount) || priceAmount <= 0) {
+      alert('Price must be greater than 0');
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:5000/api/products', {
         method: 'POST',
@@ -92,9 +160,9 @@ export default function ManageInventory() {
         body: JSON.stringify({
           product_name: newProduct.name,
           category: newProduct.category,
-          price: parseFloat(newProduct.price),
+          price: priceAmount,
           unit: newProduct.unit,
-          stock_quantity: parseInt(newProduct.stock) || 0,
+          stock_quantity: stockAmount,
           reorder_level: parseInt(newProduct.reorderLevel) || 10,
           supplier: newProduct.supplier || 'Not specified',
           shop_id: 1
@@ -121,6 +189,12 @@ export default function ManageInventory() {
       return;
     }
 
+    const stockAmount = parseInt(editingProduct.stock_quantity);
+    if (isNaN(stockAmount) || stockAmount < 0) {
+      alert('Stock cannot be negative. Please enter a valid number (0 or greater)');
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:5000/api/products/${editingProduct.product_id}`, {
         method: 'PUT',
@@ -130,7 +204,7 @@ export default function ManageInventory() {
           category: editingProduct.category,
           price: parseFloat(editingProduct.price),
           unit: editingProduct.unit,
-          stock_quantity: parseInt(editingProduct.stock_quantity) || 0,
+          stock_quantity: stockAmount,
           reorder_level: parseInt(editingProduct.reorder_level) || 10,
           supplier: editingProduct.supplier || ''
         })
@@ -171,7 +245,10 @@ export default function ManageInventory() {
   };
 
   const handleUpdateStock = async (id, newStock) => {
-    if (newStock < 0) return;
+    if (newStock < 0) {
+      alert('Stock cannot be negative');
+      return;
+    }
     try {
       const response = await fetch(`http://localhost:5000/api/products/${id}/stock`, {
         method: 'PATCH',
@@ -206,7 +283,6 @@ export default function ManageInventory() {
     window.print();
   };
 
-  // Helper function to safely format price
   const formatPrice = (price) => {
     const num = typeof price === 'string' ? parseFloat(price) : price;
     return isNaN(num) ? '0.00' : num.toFixed(2);
@@ -229,19 +305,7 @@ export default function ManageInventory() {
         <div className="text-center bg-white rounded-xl shadow-lg p-8 max-w-md">
           <div className="text-red-500 text-5xl mb-4">⚠️</div>
           <p className="text-gray-800 font-semibold">{error}</p>
-          <p className="text-gray-500 text-sm mt-2">Make sure your backend is running on port 5000</p>
-          <button 
-            onClick={fetchProducts} 
-            className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-          >
-            Retry
-          </button>
-          <button 
-            onClick={() => navigate('/admin/dashboard')} 
-            className="mt-2 ml-2 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
-          >
-            Back to Dashboard
-          </button>
+          <button onClick={fetchProducts} className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg">Retry</button>
         </div>
       </div>
     );
@@ -253,13 +317,9 @@ export default function ManageInventory() {
         <div className="flex justify-between items-center px-8 py-4">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30">
-              <ArrowLeft className="w-4 h-4" />
-              Back
+              <ArrowLeft className="w-4 h-4" /> Back
             </button>
-            <div>
-              <h1 className="text-2xl font-bold">Manage Inventory</h1>
-              <p className="text-white/90 text-sm mt-1">Track and manage your store products</p>
-            </div>
+            <div><h1 className="text-2xl font-bold">Manage Inventory</h1><p className="text-white/90 text-sm mt-1">Track and manage your store products</p></div>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30"><Printer className="w-4 h-4" /> Print</button>
@@ -270,6 +330,7 @@ export default function ManageInventory() {
       </div>
 
       <div className="p-8">
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-white rounded-xl shadow-lg p-6"><div className="flex items-center justify-between"><div><p className="text-gray-500 text-sm">Total Products</p><p className="text-2xl font-bold text-gray-800">{totalProducts}</p></div><div className="bg-purple-100 p-3 rounded-full"><Package className="text-purple-600 w-6 h-6" /></div></div></div>
           <div className="bg-white rounded-xl shadow-lg p-6"><div className="flex items-center justify-between"><div><p className="text-gray-500 text-sm">Low Stock Items</p><p className="text-2xl font-bold text-yellow-600">{lowStockCount}</p></div><div className="bg-yellow-100 p-3 rounded-full"><AlertCircle className="text-yellow-600 w-6 h-6" /></div></div></div>
@@ -277,6 +338,7 @@ export default function ManageInventory() {
           <div className="bg-white rounded-xl shadow-lg p-6"><div className="flex items-center justify-between"><div><p className="text-gray-500 text-sm">Inventory Value</p><p className="text-2xl font-bold text-green-600">R{totalValue.toLocaleString()}</p></div><div className="bg-green-100 p-3 rounded-full"><DollarSign className="text-green-600 w-6 h-6" /></div></div></div>
         </div>
 
+        {/* Search and Filter */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><input type="text" placeholder="Search products..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div></div>
@@ -284,6 +346,7 @@ export default function ManageInventory() {
           </div>
         </div>
 
+        {/* Products Table */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="p-6 border-b"><h2 className="text-xl font-bold text-gray-800">Product Inventory</h2><p className="text-gray-500 text-sm mt-1">Showing {filteredProducts.length} of {totalProducts} products</p></div>
           <div className="overflow-x-auto">
@@ -298,7 +361,7 @@ export default function ManageInventory() {
                   filteredProducts.map((product, index) => {
                     const stockQty = product.stock_quantity || 0;
                     const reorderLvl = product.reorder_level || 0;
-                    const isLowStock = stockQty <= reorderLvl;
+                    const isLowStock = stockQty <= reorderLvl && stockQty > 0;
                     const isOutOfStock = stockQty === 0;
                     return (
                       <tr key={product.product_id} className={`border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
@@ -321,10 +384,106 @@ export default function ManageInventory() {
       </div>
 
       {/* Add Product Modal */}
-      {showAddModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-xl max-w-md w-full"><div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center"><h2 className="text-xl font-bold">Add New Product</h2><button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button></div><div className="p-6"><div className="space-y-4"><input type="text" placeholder="Product Name *" className="w-full px-3 py-2 border rounded-lg" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} /><select className="w-full px-3 py-2 border rounded-lg" value={newProduct.category} onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}><option value="">Select Category *</option>{categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}</select><input type="number" step="0.01" placeholder="Price *" className="w-full px-3 py-2 border rounded-lg" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} /><select className="w-full px-3 py-2 border rounded-lg" value={newProduct.unit} onChange={(e) => setNewProduct({...newProduct, unit: e.target.value})}><option value="">Select Unit *</option>{units.map(unit => (<option key={unit} value={unit}>{unit}</option>))}</select><input type="number" placeholder="Stock" className="w-full px-3 py-2 border rounded-lg" value={newProduct.stock} onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})} /><input type="number" placeholder="Reorder Level" className="w-full px-3 py-2 border rounded-lg" value={newProduct.reorderLevel} onChange={(e) => setNewProduct({...newProduct, reorderLevel: e.target.value})} /><input type="text" placeholder="Supplier" className="w-full px-3 py-2 border rounded-lg" value={newProduct.supplier} onChange={(e) => setNewProduct({...newProduct, supplier: e.target.value})} /></div><div className="flex gap-3 mt-6"><button onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2 border rounded-lg">Cancel</button><button onClick={handleAddProduct} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Add Product</button></div></div></div></div>)}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center sticky top-0">
+              <h2 className="text-xl font-bold">Add New Product</h2>
+              <button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Product Name *</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} placeholder="Enter product name" /></div>
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1">Category *</label>
+                  <div className="flex gap-2">
+                    <select className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.category} onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}>
+                      <option value="">Select Category</option>
+                      {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                    </select>
+                    <button onClick={() => setShowNewCategoryModal(true)} className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1">
+                      <PlusCircle className="w-4 h-4" /> New
+                    </button>
+                  </div>
+                </div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Price (R) *</label><input type="number" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} placeholder="0.00" /></div>
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1">Unit *</label>
+                  <div className="flex gap-2">
+                    <select className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.unit} onChange={(e) => setNewProduct({...newProduct, unit: e.target.value})}>
+                      <option value="">Select Unit</option>
+                      {units.map(unit => (<option key={unit} value={unit}>{unit}</option>))}
+                    </select>
+                    <button onClick={() => setShowNewUnitModal(true)} className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-1">
+                      <PlusCircle className="w-4 h-4" /> New
+                    </button>
+                  </div>
+                </div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Initial Stock</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.stock} onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})} placeholder="0" min="0" /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Reorder Level</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.reorderLevel} onChange={(e) => setNewProduct({...newProduct, reorderLevel: e.target.value})} placeholder="10" min="0" /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Supplier</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newProduct.supplier} onChange={(e) => setNewProduct({...newProduct, supplier: e.target.value})} placeholder="Supplier name" /></div>
+              </div>
+              <div className="flex gap-3 mt-6"><button onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button><button onClick={handleAddProduct} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Add Product</button></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Product Modal */}
-      {showEditModal && editingProduct && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-xl max-w-md w-full"><div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center"><h2 className="text-xl font-bold">Edit Product</h2><button onClick={() => setShowEditModal(false)}><X className="w-6 h-6" /></button></div><div className="p-6"><div className="space-y-4"><input type="text" className="w-full px-3 py-2 border rounded-lg" value={editingProduct.product_name || ''} onChange={(e) => setEditingProduct({...editingProduct, product_name: e.target.value})} /><select className="w-full px-3 py-2 border rounded-lg" value={editingProduct.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}>{categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}</select><input type="number" step="0.01" className="w-full px-3 py-2 border rounded-lg" value={editingProduct.price || 0} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} /><select className="w-full px-3 py-2 border rounded-lg" value={editingProduct.unit || ''} onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value})}>{units.map(unit => (<option key={unit} value={unit}>{unit}</option>))}</select><input type="number" className="w-full px-3 py-2 border rounded-lg" value={editingProduct.stock_quantity || 0} onChange={(e) => setEditingProduct({...editingProduct, stock_quantity: parseInt(e.target.value)})} /><input type="number" placeholder="Reorder Level" className="w-full px-3 py-2 border rounded-lg" value={editingProduct.reorder_level || 0} onChange={(e) => setEditingProduct({...editingProduct, reorder_level: parseInt(e.target.value)})} /><input type="text" placeholder="Supplier" className="w-full px-3 py-2 border rounded-lg" value={editingProduct.supplier || ''} onChange={(e) => setEditingProduct({...editingProduct, supplier: e.target.value})} /></div><div className="flex gap-3 mt-6"><button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-2 border rounded-lg">Cancel</button><button onClick={handleEditProduct} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Save Changes</button></div></div></div></div>)}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Edit Product</h2>
+              <button onClick={() => setShowEditModal(false)}><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Product Name</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.product_name || ''} onChange={(e) => setEditingProduct({...editingProduct, product_name: e.target.value})} /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Category</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}>{categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}</select></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Price (R)</label><input type="number" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.price || 0} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Unit</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.unit || ''} onChange={(e) => setEditingProduct({...editingProduct, unit: e.target.value})}>{units.map(unit => (<option key={unit} value={unit}>{unit}</option>))}</select></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Stock Quantity</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.stock_quantity || 0} onChange={(e) => setEditingProduct({...editingProduct, stock_quantity: parseInt(e.target.value)})} min="0" /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Reorder Level</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.reorder_level || 0} onChange={(e) => setEditingProduct({...editingProduct, reorder_level: parseInt(e.target.value)})} min="0" /></div>
+                <div><label className="block text-gray-700 text-sm font-medium mb-1">Supplier</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={editingProduct.supplier || ''} onChange={(e) => setEditingProduct({...editingProduct, supplier: e.target.value})} /></div>
+              </div>
+              <div className="flex gap-3 mt-6"><button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button><button onClick={handleEditProduct} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Save Changes</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Category Modal */}
+      {showNewCategoryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Add New Category</h2>
+              <button onClick={() => setShowNewCategoryModal(false)}><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-6">
+              <div><label className="block text-gray-700 text-sm font-medium mb-1">Category Name</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Enter new category name" /></div>
+              <div className="flex gap-3 mt-6"><button onClick={() => setShowNewCategoryModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button><button onClick={handleAddNewCategory} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Add Category</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Unit Modal */}
+      {showNewUnitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Add New Unit</h2>
+              <button onClick={() => setShowNewUnitModal(false)}><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-6">
+              <div><label className="block text-gray-700 text-sm font-medium mb-1">Unit Name</label><input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800" value={newUnitName} onChange={(e) => setNewUnitName(e.target.value)} placeholder="Enter new unit (e.g., per box, per pack)" /></div>
+              <div className="flex gap-3 mt-6"><button onClick={() => setShowNewUnitModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button><button onClick={handleAddNewUnit} className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg">Add Unit</button></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

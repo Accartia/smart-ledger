@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Wallet, CreditCard, History, User, LogOut, 
-  ShoppingBag, Bell, HelpCircle, 
+import {
+  Wallet, CreditCard, History, User, LogOut,
+  ShoppingBag, Bell, HelpCircle,
   TrendingUp, Clock, CheckCircle, Store
 } from 'lucide-react';
 
@@ -13,7 +13,7 @@ export default function CustomerDashboard() {
   const [error, setError] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
-  
+
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   // Helper function to safely format currency
@@ -57,13 +57,13 @@ export default function CustomerDashboard() {
       const response = await fetch(`http://localhost:5000/api/customers/${currentUser.customer_id}`);
       if (!response.ok) throw new Error('Failed to fetch customer data');
       const data = await response.json();
-      
+
       const processedData = {
         ...data,
         outstanding_balance: parseNumeric(data.outstanding_balance),
         credit_limit: parseNumeric(data.credit_limit)
       };
-      
+
       setCustomer(processedData);
     } catch (error) {
       console.error('Error fetching customer:', error);
@@ -151,7 +151,7 @@ export default function CustomerDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => navigate('/customer/notifications')}
                 className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors relative"
               >
@@ -163,8 +163,16 @@ export default function CustomerDashboard() {
                 )}
               </button>
             </div>
-            <button onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/'); }} className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30">
-              <LogOut className="w-4 h-4" /> Logout
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'http://localhost:5173/';
+              }}
+              className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
             </button>
           </div>
         </div>
