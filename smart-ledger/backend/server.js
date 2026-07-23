@@ -62,81 +62,119 @@ app.get('/api/test', (req, res) => {
 });
 
 // ==========================================
-// AUTHENTICATION ROUTES
+// LOGIN ROUTE (FIXED)
 // ==========================================
-
-// Login for all roles
 app.post('/api/login', (req, res) => {
     const { email, password, role } = req.body;
     
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Email:', email);
+    console.log('Role:', role);
+    
+    if (!email || !password || !role) {
+        console.log('Missing login fields');
+        return res.status(400).json({ error: 'Email, password, and role are required' });
+    }
+    
     db.query('SELECT * FROM users WHERE email = ? AND role = ?', [email, role], async (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
-        
-        const user = results[0];
-        const validPassword = await bcrypt.compare(password, user.password);
-        
-        if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
-        
-        // Update last login
-        db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id]);
-        
-        if (role === 'customer') {
-            addNotification(user.user_id, 'Welcome Back!', `Welcome back to Smart Ledger! You logged in at ${new Date().toLocaleTimeString()}.`, 'success');
+        if (err) {
+            console.error('Login query error:', err);
+            return res.status(500).json({ error: 'Database error' });
         }
         
-        const token = jwt.sign({ userId: user.user_id, role: user.role }, process.env.JWT_SECRET || 'smart_ledger_secret', { expiresIn: '24h' });
+        if (results.length === 0) {
+            console.log('User not found');
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
         
-        let userData = { id: user.user_id, email: user.email, role: user.role, username: user.username };
+        const user = results[0];
         
-        if (role === 'customer') {
-            db.query('SELECT * FROM customers WHERE user_id = ?', [user.user_id], (err, customerData) => {
-                if (customerData.length > 0) {
-                    userData = { ...userData, ...customerData[0] };
-                }
-                res.json({ success: true, token, user: userData });
-            });
-        } else if (role === 'cashier') {
-            // STEP 3: Updated cashier login to return shop_id and shop_name
-            db.query(`SELECT c.*, u.email, u.username, s.shop_id, s.shop_name 
-                      FROM cashiers c 
-                      JOIN users u ON c.user_id = u.user_id 
-                      LEFT JOIN shops s ON c.shop_id = s.shop_id 
-                      WHERE u.email = ?`, 
-                [email], 
-                (err, cashierData) => {
+        try {
+            const validPassword = await bcrypt.compare(password, user.password);
+            
+            if (!validPassword) {
+                console.log('Invalid password');
+                return res.status(401).json({ error: 'Invalid credentials' });
+            }
+            
+            // Update last login
+            db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [user.user_id]);
+            
+            if (role === 'customer') {
+                addNotification(user.user_id, 'Welcome Back!', `Welcome back to Smart Ledger! You logged in at ${new Date().toLocaleTimeString()}.`, 'success');
+            }
+            
+            const token = jwt.sign({ userId: user.user_id, role: user.role }, process.env.JWT_SECRET || 'smart_ledger_secret', { expiresIn: '24h' });
+            
+            let userData = { id: user.user_id, email: user.email, role: user.role, username: user.username };
+            
+            if (role === 'customer') {
+                db.query('SELECT * FROM customers WHERE user_id = ?', [user.user_id], (err, customerData) => {
                     if (err) {
-                        console.error('Cashier data error:', err);
-                        return res.status(500).json({ error: err.message });
+                        console.error('Customer data error:', err);
+                        return res.status(500).json({ error: 'Error fetching customer data' });
                     }
-                    if (cashierData.length > 0) {
-                        userData = { 
-                            ...userData, 
-                            ...cashierData[0],
-                            shop_id: cashierData[0].shop_id,
-                            shop_name: cashierData[0].shop_name,
-                            full_name: cashierData[0].full_name,
-                            position: cashierData[0].position
-                        };
+                    if (customerData.length > 0) {
+                        userData = { ...userData, ...customerData[0] };
                     }
+                    console.log('Customer login successful');
                     res.json({ success: true, token, user: userData });
                 });
-        } else if (role === 'admin') {
-            db.query('SELECT shop_id, shop_name FROM shops WHERE owner_id = ?', [user.user_id], (err, shopData) => {
-                if (!err && shopData.length > 0) {
-                    userData = { ...userData, shop_id: shopData[0].shop_id, shop_name: shopData[0].shop_name };
-                }
+            } else if (role === 'cashier') {
+                db.query(`SELECT c.*, s.shop_id, s.shop_name 
+                          FROM cashiers c 
+                          LEFT JOIN shops s ON c.shop_id = s.shop_id 
+                          WHERE c.user_id = ?`, 
+                    [user.user_id], 
+                    (err, cashierData) => {
+                        if (err) {
+                            console.error('Cashier data error:', err);
+                            return res.status(500).json({ error: 'Error fetching cashier data' });
+                        }
+                        if (cashierData.length > 0) {
+                            userData = { ...userData, ...cashierData[0] };
+                        }
+                        console.log('Cashier login successful');
+                        res.json({ success: true, token, user: userData });
+                    });
+            } else if (role === 'admin') {
+                db.query('SELECT shop_id, shop_name FROM shops WHERE owner_id = ?', [user.user_id], (err, shopData) => {
+                    if (err) {
+                        console.error('Shop data error:', err);
+                        return res.status(500).json({ error: 'Error fetching shop data' });
+                    }
+                    if (shopData.length > 0) {
+                        userData = { ...userData, shop_id: shopData[0].shop_id, shop_name: shopData[0].shop_name };
+                    }
+                    console.log('Admin login successful');
+                    res.json({ success: true, token, user: userData });
+                });
+            } else {
                 res.json({ success: true, token, user: userData });
-            });
-        } else {
-            res.json({ success: true, token, user: userData });
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            res.status(500).json({ error: 'Internal server error' });
         }
     });
 });
 
-// Register Customer
+// ==========================================
+// REGISTER CUSTOMER (COMPLETELY FIXED)
+// ==========================================
 app.post('/api/register/customer', async (req, res) => {
     const { fullName, email, cellphone, gender, address, employmentStatus, monthlyIncome, password, shopId } = req.body;
+    
+    console.log('=== CUSTOMER REGISTRATION ===');
+    console.log('Full Name:', fullName);
+    console.log('Email:', email);
+    console.log('Shop ID received:', shopId);
+    
+    // Validate required fields
+    if (!fullName || !email || !cellphone || !gender || !address || !employmentStatus || !monthlyIncome || !password) {
+        console.log('Missing required fields');
+        return res.status(400).json({ error: 'All fields are required' });
+    }
     
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -154,125 +192,219 @@ app.post('/api/register/customer', async (req, res) => {
             else if (monthlyIncome === '2420') creditLimit = 1500;
         }
         
+        // Use default shop ID 1 if shopId is not provided or invalid
+        let finalShopId = 1;
+        if (shopId) {
+            const parsed = parseInt(shopId);
+            if (!isNaN(parsed) && parsed > 0) {
+                finalShopId = parsed;
+            }
+        }
+        
+        console.log('Final shop ID:', finalShopId);
+        console.log('Credit limit:', creditLimit);
+        
+        // Start transaction
         db.beginTransaction((err) => {
-            if (err) throw err;
+            if (err) {
+                console.error('Transaction error:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
             
+            // Insert user
             db.query('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
                 [email, email, hashedPassword, 'customer', 'active'],
                 (err, userResult) => {
                     if (err) {
-                        return db.rollback(() => { console.error(err); });
+                        console.error('User insert error:', err);
+                        return db.rollback(() => {
+                            res.status(500).json({ error: 'Error creating user' });
+                        });
                     }
                     
                     const userId = userResult.insertId;
+                    console.log('User created with ID:', userId);
                     
+                    // Insert customer
                     db.query(`INSERT INTO customers (user_id, full_name, cellphone, gender, address, 
                               employment_status, monthly_income, credit_limit, outstanding_balance, shop_id, status) 
                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'active')`,
-                        [userId, fullName, cellphone, gender, address, employmentStatus, monthlyIncome, creditLimit, shopId],
+                        [userId, fullName, cellphone, gender, address, employmentStatus, monthlyIncome, creditLimit, finalShopId],
                         (err) => {
                             if (err) {
-                                return db.rollback(() => { console.error(err); });
+                                console.error('Customer insert error:', err);
+                                return db.rollback(() => {
+                                    res.status(500).json({ error: 'Error creating customer' });
+                                });
                             }
                             
+                            console.log('Customer created successfully!');
+                            
+                            // Add welcome notification
                             addNotification(userId, 'Welcome to Smart Ledger!', `Your account has been created successfully. Your credit limit is R${creditLimit}.`, 'success');
                             
                             db.commit((err) => {
                                 if (err) {
-                                    return db.rollback(() => { console.error(err); });
+                                    console.error('Commit error:', err);
+                                    return db.rollback(() => {
+                                        res.status(500).json({ error: 'Error completing registration' });
+                                    });
                                 }
+                                console.log('Registration completed successfully!');
                                 res.json({ success: true, message: 'Registration successful!' });
                             });
                         });
                 });
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Registration error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 // ==========================================
-// REGISTER CASHIER (STEP 2 - Updated)
+// REGISTER CASHIER
 // ==========================================
 app.post('/api/register/cashier', async (req, res) => {
     const { firstName, lastName, email, phone, shopId, position, password } = req.body;
     
     console.log('=== CASHIER REGISTRATION ===');
     console.log('First Name:', firstName);
-    console.log('Last Name:', lastName);
     console.log('Email:', email);
-    console.log('Shop ID:', shopId);
-    console.log('Position:', position);
     
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const fullName = `${firstName} ${lastName}`;
         
-        // Check if shop exists and is active
-        db.query('SELECT shop_id, shop_name FROM shops WHERE shop_id = ? AND status = "active"', [shopId], (err, shopResult) => {
+        let finalShopId = 1;
+        if (shopId) {
+            const parsed = parseInt(shopId);
+            if (!isNaN(parsed) && parsed > 0) {
+                finalShopId = parsed;
+            }
+        }
+        
+        db.beginTransaction((err) => {
             if (err) {
-                console.error('Error checking shop:', err);
-                return res.status(500).json({ error: err.message });
-            }
-            if (shopResult.length === 0) {
-                return res.status(400).json({ error: 'Invalid shop selected' });
+                console.error('Transaction error:', err);
+                return res.status(500).json({ error: 'Database error' });
             }
             
-            const shopName = shopResult[0].shop_name;
-            
-            db.beginTransaction((err) => {
-                if (err) {
-                    console.error('Transaction error:', err);
-                    return res.status(500).json({ error: err.message });
-                }
-                
-                db.query('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
-                    [email, email, hashedPassword, 'cashier', 'active'],
-                    (err, userResult) => {
-                        if (err) {
-                            console.error('User insert error:', err);
-                            return db.rollback(() => {
-                                res.status(500).json({ error: err.message });
-                            });
-                        }
-                        
-                        const userId = userResult.insertId;
-                        
-                        db.query(`INSERT INTO cashiers (user_id, full_name, email, phone, shop_id, position, status) 
-                                  VALUES (?, ?, ?, ?, ?, ?, 'active')`,
-                            [userId, fullName, email, phone, shopId, position],
-                            (err) => {
+            db.query('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
+                [email, email, hashedPassword, 'cashier', 'active'],
+                (err, userResult) => {
+                    if (err) {
+                        console.error('User insert error:', err);
+                        return db.rollback(() => {
+                            res.status(500).json({ error: 'Error creating user' });
+                        });
+                    }
+                    
+                    const userId = userResult.insertId;
+                    
+                    db.query(`INSERT INTO cashiers (user_id, full_name, email, phone, shop_id, position, status) 
+                              VALUES (?, ?, ?, ?, ?, ?, 'active')`,
+                        [userId, fullName, email, phone, finalShopId, position],
+                        (err) => {
+                            if (err) {
+                                console.error('Cashier insert error:', err);
+                                return db.rollback(() => {
+                                    res.status(500).json({ error: 'Error creating cashier' });
+                                });
+                            }
+                            
+                            db.commit((err) => {
                                 if (err) {
-                                    console.error('Cashier insert error:', err);
+                                    console.error('Commit error:', err);
                                     return db.rollback(() => {
-                                        res.status(500).json({ error: err.message });
+                                        res.status(500).json({ error: 'Error completing registration' });
                                     });
                                 }
-                                
-                                db.commit((err) => {
-                                    if (err) {
-                                        console.error('Commit error:', err);
-                                        return db.rollback(() => {
-                                            res.status(500).json({ error: err.message });
-                                        });
-                                    }
-                                    console.log('Cashier registered successfully for shop:', shopName);
-                                    res.json({ success: true, message: 'Cashier registered successfully!' });
-                                });
+                                console.log('Cashier registered successfully');
+                                res.json({ success: true, message: 'Cashier registered successfully!' });
                             });
-                    });
-            });
+                        });
+                });
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
 // ==========================================
-// CUSTOMER ROUTES (with shop filtering)
+// REGISTER SHOP OWNER
+// ==========================================
+app.post('/api/register/admin', async (req, res) => {
+    const { fullName, email, phone, shopName, password } = req.body;
+    
+    console.log('=== ADMIN REGISTRATION ===');
+    console.log('Full Name:', fullName);
+    console.log('Shop Name:', shopName);
+    
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        db.beginTransaction((err) => {
+            if (err) {
+                console.error('Transaction error:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
+            
+            db.query('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
+                [email, email, hashedPassword, 'admin', 'active'],
+                (err, userResult) => {
+                    if (err) {
+                        console.error('User insert error:', err);
+                        return db.rollback(() => {
+                            res.status(500).json({ error: 'Error creating user' });
+                        });
+                    }
+                    
+                    const userId = userResult.insertId;
+                    
+                    db.query('INSERT INTO shops (shop_name, contact_number, email, owner_id, status) VALUES (?, ?, ?, ?, ?)',
+                        [shopName, phone, email, userId, 'active'],
+                        (err) => {
+                            if (err) {
+                                console.error('Shop insert error:', err);
+                                return db.rollback(() => {
+                                    res.status(500).json({ error: 'Error creating shop' });
+                                });
+                            }
+                            
+                            db.commit((err) => {
+                                if (err) {
+                                    console.error('Commit error:', err);
+                                    return db.rollback(() => {
+                                        res.status(500).json({ error: 'Error completing registration' });
+                                    });
+                                }
+                                console.log('Admin registered successfully');
+                                res.json({ success: true, message: 'Shop owner registered successfully!' });
+                            });
+                        });
+                });
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ==========================================
+// OTHER ROUTES (Keep all your existing routes below)
 // ==========================================
 
+// SHOP ROUTES
+app.get('/api/shops', (req, res) => {
+    db.query('SELECT * FROM shops WHERE status = "active"', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// CUSTOMER ROUTES (with shop filtering)
 app.get('/api/customers', (req, res) => {
     const shopId = req.headers['shop-id'];
     
@@ -345,9 +477,7 @@ app.put('/api/customers/:id', (req, res) => {
     });
 });
 
-// ==========================================
 // DASHBOARD STATS
-// ==========================================
 app.get('/api/dashboard/stats', (req, res) => {
     const shopId = req.headers['shop-id'];
     
@@ -412,9 +542,7 @@ app.get('/api/dashboard/stats', (req, res) => {
     });
 });
 
-// ==========================================
 // PAYMENT ROUTE
-// ==========================================
 app.post('/api/transactions/payment', async (req, res) => {
     const { customerId, amount, paymentMethod, cashierId } = req.body;
     
@@ -476,9 +604,7 @@ app.post('/api/transactions/payment', async (req, res) => {
     });
 });
 
-// ==========================================
 // SALE ROUTE
-// ==========================================
 app.post('/api/transactions/sale', async (req, res) => {
     const { customerId, cashierId, items, total, paymentMethod } = req.body;
     
@@ -539,9 +665,7 @@ app.post('/api/transactions/sale', async (req, res) => {
     });
 });
 
-// ==========================================
 // PRODUCT ROUTES
-// ==========================================
 app.get('/api/products', (req, res) => {
     db.query('SELECT * FROM products WHERE status = "active" ORDER BY product_name', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -586,19 +710,7 @@ app.patch('/api/products/:id/stock', (req, res) => {
     });
 });
 
-// ==========================================
-// SHOP ROUTES
-// ==========================================
-app.get('/api/shops', (req, res) => {
-    db.query('SELECT * FROM shops WHERE status = "active"', (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
-    });
-});
-
-// ==========================================
 // NOTIFICATION ROUTES
-// ==========================================
 app.get('/api/notifications/:userId', (req, res) => {
     db.query('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC', 
         [req.params.userId], (err, results) => {
@@ -631,9 +743,7 @@ app.delete('/api/notifications/:id', (req, res) => {
         });
 });
 
-// ==========================================
 // TRANSACTION ROUTES
-// ==========================================
 app.get('/api/transactions/daily/:date', (req, res) => {
     const date = req.params.date;
     db.query(`SELECT t.*, c.full_name as customer_name, cash.full_name as cashier_name
@@ -660,36 +770,6 @@ app.get('/api/transactions/customer/:customerId', (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
-});
-
-// ==========================================
-// REGISTER SHOP OWNER
-// ==========================================
-app.post('/api/register/admin', async (req, res) => {
-    const { fullName, email, phone, shopName, password } = req.body;
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        db.beginTransaction((err) => {
-            if (err) throw err;
-            db.query('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
-                [email, email, hashedPassword, 'admin', 'active'],
-                (err, userResult) => {
-                    if (err) return db.rollback(() => { console.error(err); });
-                    const userId = userResult.insertId;
-                    db.query('INSERT INTO shops (shop_name, contact_number, email, owner_id, status) VALUES (?, ?, ?, ?, ?)',
-                        [shopName, phone, email, userId, 'active'],
-                        (err) => {
-                            if (err) return db.rollback(() => { console.error(err); });
-                            db.commit((err) => {
-                                if (err) return db.rollback(() => { console.error(err); });
-                                res.json({ success: true, message: 'Shop owner registered successfully!' });
-                            });
-                        });
-                });
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
 });
 
 // ==========================================
