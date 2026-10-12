@@ -17,6 +17,10 @@ const db = mysql.createConnection({
     database: process.env.DB_NAME || 'smart_ledger'
 });
 
+if (process.env.NODE_ENV === 'test') {
+    console.log('Backend tests are running in isolated mode.');
+}
+
 db.connect((err) => {
     if (err) {
         console.error('Database connection failed:', err);
@@ -24,6 +28,13 @@ db.connect((err) => {
     }
     console.log('✅ Connected to MySQL database');
 });
+
+if (require.main === module) {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+}
 
 // ==========================================
 // NOTIFICATION HELPER FUNCTIONS
@@ -52,6 +63,14 @@ const getUserIdByCashierId = (cashierId) => {
             else resolve(results[0]?.user_id);
         });
     });
+};
+
+module.exports = {
+    app,
+    db,
+    addNotification,
+    getUserIdByCustomerId,
+    getUserIdByCashierId,
 };
 
 // ==========================================
@@ -159,9 +178,9 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// ==========================================
+
 // REGISTER CUSTOMER (COMPLETELY FIXED)
-// ==========================================
+
 app.post('/api/register/customer', async (req, res) => {
     const { fullName, email, cellphone, gender, address, employmentStatus, monthlyIncome, password, shopId } = req.body;
     
@@ -262,9 +281,9 @@ app.post('/api/register/customer', async (req, res) => {
     }
 });
 
-// ==========================================
+
 // REGISTER CASHIER
-// ==========================================
+
 app.post('/api/register/cashier', async (req, res) => {
     const { firstName, lastName, email, phone, shopId, position, password } = req.body;
     
